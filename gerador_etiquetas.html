@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gerador de Etiquetas 100 × 60 mm</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&family=Playfair+Display:ital,wght@1,500&display=swap" rel="stylesheet">
+<style>
+  /* Identidade visual Bela Flor (cores lidas do print do site; ajuste aqui se tiver o hex oficial). */
+  :root { color-scheme: light; --bg:#ffffff; --panel:#f9f7f3; --line:#e8e2d6; --muted:#8c857a; --text:#5b5750;
+          --accent:#cba052; --accent-dark:#b8893b; --gold-soft:#fbf6ec; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font:14px/1.5 Montserrat,Arial,sans-serif; }
+  header { background:var(--panel); border-top:3px solid #111; padding:14px 26px 16px; text-align:center; }
+  .brand { display:inline-block; text-align:center; }
+  .brand .fleur { color:var(--accent); font-size:22px; line-height:1; }
+  .brand .wordmark { font-family:"Playfair Display",Georgia,serif; font-style:italic; font-weight:500; font-size:30px; color:var(--accent);
+                     line-height:1.15; padding:0 18px 2px; border-bottom:2px solid var(--accent); }
+  header h1 { margin:10px 0 2px; font-size:15px; font-weight:600; letter-spacing:.04em; text-transform:uppercase; color:var(--text); }
+  header p { margin:0; color:var(--muted); font-size:12px; }
+  main { display:grid; grid-template-columns:minmax(300px,390px) 1fr; gap:22px; padding:22px; max-width:1500px; margin:auto; }
+  .panel { background:var(--panel); border:1px solid var(--line); border-radius:6px; padding:20px; height:max-content; }
+  h2 { font-size:14px; font-weight:600; margin:0 0 15px; color:var(--text); }
+  .fields { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  .field { display:flex; flex-direction:column; gap:5px; min-width:0; }
+  .field.full { grid-column:1/-1; }
+  label { color:var(--text); font-size:12px; font-weight:500; }
+  input { width:100%; border:1px solid var(--accent); border-radius:4px; background:#fff; color:var(--text); padding:10px 12px; font:500 14px Montserrat,Arial,sans-serif; outline:none; }
+  input:focus { border-color:var(--accent-dark); box-shadow:0 0 0 3px rgba(203,160,82,.25); }
+  .section { margin-top:20px; padding-top:17px; border-top:1px solid var(--line); }
+  .hint { color:var(--muted); font-size:12px; margin:8px 0 0; }
+  .actions { display:flex; flex-wrap:wrap; gap:9px; margin-top:17px; }
+  button { border:1px solid var(--accent); border-radius:3px; padding:11px 16px; font:700 13px Montserrat,Arial,sans-serif; cursor:pointer; transition:background .15s; }
+  .primary { background:var(--accent); color:#fff; }
+  .primary:hover:not(:disabled) { background:var(--accent-dark); border-color:var(--accent-dark); }
+  .secondary { background:#fff; color:var(--accent-dark); }
+  .secondary:hover:not(:disabled) { background:var(--gold-soft); }
+  button:disabled { opacity:.55; cursor:wait; }
+  .preview-area { min-width:0; }
+  .preview-head { display:flex; align-items:center; justify-content:space-between; gap:12px; margin:0 0 13px; }
+  .preview-head h2 { margin:0; }
+  #status { color:var(--muted); font-size:12px; }
+  #labels { display:flex; flex-wrap:wrap; gap:14px; align-items:flex-start; }
+
+  /* Etiqueta 100 x 60 mm. A área útil (.band) usa as MESMAS coordenadas em px (96 dpi) do FP3,
+     com margem de 0,5 mm — por isso prévia, impressão e FP3 saem iguais. */
+  .label {
+    width:100mm; height:60mm; flex:0 0 100mm; position:relative; overflow:hidden;
+    background:#fff; color:#000; border:1px solid #d9d2c4; box-shadow:0 1px 4px rgba(120,100,60,.15);
+    font-family:Arial,"Liberation Sans",Helvetica,sans-serif; font-weight:700;
+  }
+  .band { position:absolute; left:1.88976px; top:1.88976px; width:374.17347px; height:222.99227px; }
+  .obj { position:absolute; padding:1px 2px; overflow:hidden; line-height:1.15; white-space:nowrap; }
+  .obj.wrap { white-space:normal; }
+  .obj.center { text-align:center; }
+  .obj.right { text-align:right; }
+  .qr { position:absolute; }
+  .qr img, .qr canvas { width:100% !important; height:100% !important; display:block; }
+  .empty { color:var(--muted); padding:30px; background:var(--panel); border:1px dashed var(--accent); border-radius:6px; }
+  @media(max-width:900px) { main { grid-template-columns:1fr; } }
+
+  /* Impressão: cada etiqueta = uma página de 100 mm (largura) x 60 mm (altura), paisagem. */
+  @page { size: 100mm 60mm; margin: 0; }
+  @media print {
+    html, body { margin:0 !important; padding:0 !important; width:100mm !important; min-width:100mm !important; height:auto !important; background:#fff !important; }
+    header, .panel, .preview-head, .empty { display:none !important; }
+    main { display:block; margin:0; padding:0; max-width:none; }
+    .preview-area { margin:0; padding:0; }
+    #labels { display:block; margin:0; padding:0; }
+    .label {
+      box-sizing:border-box !important; width:100mm !important; min-width:100mm !important; max-width:100mm !important;
+      height:60mm !important; min-height:60mm !important; max-height:60mm !important;
+      border:0 !important; box-shadow:none !important; margin:0 !important; page-break-after:always; break-after:page;
+    }
+    .label:last-child { page-break-after:auto; break-after:auto; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="brand"><div class="fleur">⚜</div><div class="wordmark">Bela Flor</div></div>
+  <h1>Gerador de etiquetas</h1>
+  <p>Modelo 100 × 60 mm · QR Code individual por volume</p>
+</header>
+<main>
+  <section class="panel">
+    <h2>Informações da etiqueta</h2>
+    <div class="fields">
+      <div class="field"><label for="nf">Nota Fiscal</label><input id="nf" value=""></div>
+      <div class="field"><label for="pedido">Pedido</label><input id="pedido" value=""></div>
+      <div class="field"><label for="coleta">Transp. Coleta</label><input id="coleta" value=""></div>
+      <div class="field"><label for="redespacho">Redespacho (opcional)</label><input id="redespacho" value=""></div>
+      <div class="field full"><label for="cliente">Cliente</label><input id="cliente" value=""></div>
+      <div class="field full"><label for="endereco">Endereço</label><input id="endereco" value=""></div>
+      <div class="field"><label for="bairro">Complemento / bairro</label><input id="bairro" value=""></div>
+      <div class="field"><label for="cidade">Cidade - UF</label><input id="cidade" value=""></div>
+      <div class="field"><label for="cep">CEP</label><input id="cep" value=""></div>
+    </div>
+    <div class="section">
+      <h2>Volumes</h2>
+      <div class="fields">
+        <div class="field"><label for="total">Total de volumes</label><input id="total" type="number" min="1" max="5000" value="" placeholder="Ex.: 10"></div>
+        <div class="field"><label for="inicio">Começar pelo volume</label><input id="inicio" type="number" min="1" value="" placeholder="1 (padrão)"></div>
+      </div>
+      <p class="hint">O QR segue o padrão do FP3 da empresa: pedido com 9 dígitos (zeros à esquerda) + hífen + volume com 4 dígitos. Ex.: 000139579-0001.</p>
+    </div>
+    <div class="actions">
+      <button class="primary" id="generate">Gerar etiquetas</button>
+      <button class="secondary" id="print">Imprimir</button>
+      <button class="primary" id="exportFp3">Exportar FP3</button>
+      <button class="secondary" id="clear">Limpar prévia</button>
+    </div>
+    <p class="hint">Na janela de impressão, selecione papel personalizado de 100 × 60 mm (largura × altura), orientação horizontal/paisagem, escala 100% / tamanho real e desative cabeçalhos e rodapés.</p>
+    <p class="hint">O FP3 é gerado com a estrutura do relatório de exemplo (FastReport). Depois de exportar, abra-o no programa da empresa para validar. Para um teste rápido, use Total = 2.</p>
+  </section>
+  <section class="preview-area">
+    <div class="preview-head"><h2>Pré-visualização</h2><span id="status">Nenhuma etiqueta gerada</span></div>
+    <div id="labels"><div class="empty">Preencha os dados e clique em “Gerar etiquetas”.</div></div>
+  </section>
+</main>
+<script>
+/* Núcleo do gerador: layout único (prévia + FP3) e escrita do FP3 (FastReport "prepared report").
+ *
+ * Estrutura do FP3 (confirmada em 148567.fp3):
+ *  - <previewpages>: uma <page0> por etiqueta. Guarda SÓ texto (u="") de cada objeto e o HexData do QR.
+ *  - <sourcepages>:  o relatório-fonte. É AQUI que ficam Left/Top/Width/Height/fonte/alinhamento de cada campo.
+ *  - <dictionary>:   liga m1..m14 / b2 aos objetos do sourcepages (ex.: m8 -> NroPedido).
+ * Logo, mover um campo = mudar o sourcepages; mudar só o texto das páginas nunca muda a posição.
+ */
+(function (root) {
+  'use strict';
+
+  var BAND_W = 374.17347, BAND_H = 222.99227;   // área útil em px (96 dpi): 100x60 mm menos margem de 0,5 mm
+  var MARGIN_PX = 1.88976;                       // 0,5 mm
+  var GAP_X = 2, GAP_Y = 1;                      // recuo interno padrão do TfrxMemoView
+  var INSET_PX = 3.77953;                        // recuo extra de 1 mm dentro da margem de página de 0,5 mm => margem total mínima de 1,5 mm nos 4 lados
+  var MIN_FONT = 8;
+  var QR_PEDIDO_DIGITS = 9;                      // o FP3 da empresa usa pedido com 9 dígitos: 000148567-0001. Use 0 para não preencher.
+
+  var fmt = function (n) { return String(n).replace('.', ','); };
+  var esc = function (s) {
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  };
+  var Q = '&#34;';
+  var DS = 'frxDBEtiquetaNova.';
+
+  // Objetos do relatório-fonte, na MESMA ordem e com os MESMOS nomes do FP3 original.
+  // idx = número m# da página processada (dicionário).
+  var DEFS = [
+    { idx: 1,  name: 'Memo4',                      key: 'clienteLabel', src: 'CLIENTE:' },
+    { idx: 2,  name: 'Memo5',                      key: 'cliente',  src: '[' + DS + Q + 'NOMCLI' + Q + ']' },
+    { idx: 3,  name: 'Memo6',                      key: 'endereco', src: '[' + DS + Q + 'Endereco' + Q + ']' },
+    { idx: 4,  name: 'Memo7',                      key: 'bairro',   src: '[' + DS + Q + 'COMCLI' + Q + ']' },
+    { idx: 5,  name: 'Memo8',                      key: 'cidade',   src: '[' + DS + Q + 'Cidade' + Q + ']',
+      prop: '07466F726D61747301011200000000000112000000000001120000000000011200000000000112000000000000' },
+    { idx: 6,  name: 'frxDBEtiquetaNovaCEPCLI',    key: 'cep',      indexTag: true, src: '[' + DS + Q + 'CEPCLI' + Q + ']' },
+    { idx: 7,  name: 'Memo9',                      key: 'pedidoLabel', src: 'Pedido' },
+    { idx: 8,  name: 'frxDBEtiquetaNovaNroPedido', key: 'pedido',   indexTag: true, src: '[' + DS + Q + 'NroPedido' + Q + ']' },
+    { idx: 9,  name: 'Memo10',                     key: 'nfLabel',  src: 'Nota Fiscal' },
+    { idx: 10, name: 'Memo11',                     key: 'nf',       indexTag: true, src: '[' + DS + Q + 'NroNota' + Q + ']' },
+    { idx: 11, name: 'Memo12',                     key: 'volLabel', src: 'VOL' },
+    { idx: 12, name: 'frxDBEtiquetaNovaNroVolume', key: 'vol',      indexTag: true,
+      src: '[' + DS + Q + 'NroVolume' + Q + ']/[' + DS + Q + 'VolTot' + Q + ']' },
+    { idx: 13, name: 'frxDBEtiquetaNovaNOMTRA',    key: 'transp',   indexTag: true, stretch: true,
+      src: 'Transp Coleta: [' + DS + Q + 'NOMTRA' + Q + ']' },
+    { idx: 14, name: 'Memo13',                     key: 'redesp',   indexTag: true, stretch: true,
+      src: 'Redespacho: Frete FOB - [' + DS + Q + 'NOMTRA' + Q + ']' }
+  ];
+
+  // ---------------------------------------------------------------------------------------------
+  // LAYOUT NOVO (px, relativo à banda; mesma unidade e origem do FP3).
+  // Valores herdados do FP3 original, exceto o bloco superior (Pedido) e o meio (ver comentários).
+  // ---------------------------------------------------------------------------------------------
+  var QR = { left: 292.53543527, top: 4.377953, width: 77.85826918, height: 77.85826918 };   // original
+
+  var GEOM = {
+    // Cabeçalho: Nota Fiscal | PEDIDO (centralizado entre NF e VOL) | VOL | QR
+    9:  { l: 3.77953,  t: 3.77953,     w: 92.59, h: 18.05775444, font: 12 },                       // "Nota Fiscal"  (original)
+    10: { l: 3.77953,  t: 21.83728,    w: 92.59, h: 23.51707556, font: 19 },                       // nº da NF       (original)
+    7:  { l: 98,       t: 3.77953,     w: 97,       h: 15.11812,    font: 12, align: 'haCenter' },    // "Pedido"       (NOVO: topo)
+    8:  { l: 98,       t: 18.89765,    w: 97,       h: 23.51707556, font: 19, align: 'haCenter' },    // nº do pedido   (NOVO: topo)
+    11: { l: 197,      t: 3.77953,     w: 93,       h: 15.11812,    font: 12, align: 'haCenter' },    // "VOL"          (X ajustado p/ abrir espaço ao Pedido)
+    12: { l: 197,      t: 18.89765,    w: 93,       h: 22.67718,    font: 16, align: 'haCenter' },    // 1/10           (X ajustado)
+    // Rodapé (todos originais, exceto CEP: agora em negrito e alinhado à direita)
+    1:  { l: 3.77953,     t: 132,          w: 63.874057,  h: 17.00787402, font: 13 },
+    2:  { l: 69.00791966, t: 132,          w: 297.826964, h: 17.00787402, font: 13 },
+    3:  { l: 3.77953,     t: 149.00787402, w: 362.83488,  h: 17.00787402, font: 13 },
+    4:  { l: 3.77953,     t: 166.01574803, w: 363.212833, h: 17.00787402, font: 13 },
+    5:  { l: 3.77953,     t: 183.02362205, w: 362.83488, h: 17.00787402, font: 13 },
+    6:  { l: 3.77953,     t: 200.03149606, w: 100,        h: 17.00787402, font: 13 }   // CEP: linha própria, à esquerda, abaixo da cidade (escolha do usuário)
+  };
+  // Meio: Transp Coleta + Redespacho
+  var MID_WITH_REDESP = {
+    13: { l: 3.77953, t: 57.69295,   w: 288, h: 34.01574559, font: 13, lines: 2 },   // original (largura evita o QR)
+    14: { l: 3.77953, t: 91.7087,    w: 366.61441, h: 34.01577,    font: 13, lines: 2 }    // logo abaixo do transporte
+  };
+  var MID_NO_REDESP = {
+    13: { l: 3.77953, t: 96,         w: 366.61441, h: 34.01574559, font: 13, lines: 2 },   // sem redespacho: transporte centralizado no miolo livre
+    14: { l: 3.77953, t: 130.1,      w: 366.61441, h: 1.8,         font: 13, lines: 2 }    // objeto vazio (sem texto, sem moldura): nada é desenhado
+  };
+
+  // ---------------------------------------------------------------------------------------------
+  // Ajuste de fonte: nada pode ser cortado nem sobrepor.
+  // ---------------------------------------------------------------------------------------------
+  function wrapLines(text, avail, px, measure) {
+    var words = String(text).split(' '), lines = 1, cur = '';
+    for (var i = 0; i < words.length; i++) {
+      var w = words[i];
+      if (measure(w, px) > avail) return Infinity;
+      var t = cur ? cur + ' ' + w : w;
+      if (measure(t, px) <= avail) cur = t; else { lines++; cur = w; }
+    }
+    return lines;
+  }
+  function fitFont(text, boxW, startPx, maxLines, measure) {
+    if (!text) return { px: startPx, ok: true };
+    var avail = (boxW - 2 * GAP_X) * 0.98;           // 2% de folga p/ diferenças GDI x navegador
+    for (var px = startPx; px >= MIN_FONT; px--) {
+      if (wrapLines(text, avail, px, measure) <= maxLines) return { px: px, ok: true };
+    }
+    return { px: MIN_FONT, ok: false };
+  }
+
+  function qrText(pedido, n) {
+    var p = String(pedido).trim();
+    if (QR_PEDIDO_DIGITS > 0 && /^\d+$/.test(p)) p = p.padStart(QR_PEDIDO_DIGITS, '0');
+    return p + '-' + String(n).padStart(4, '0');
+  }
+
+  // v = {nf,pedido,coleta,redespacho,cliente,endereco,bairro,cidade,cep,total}
+  function computeLayout(v, measure) {
+    var hasRed = !!String(v.redespacho || '').trim();
+    var up = function (s) { return String(s || '').trim().toUpperCase(); };
+    var tr = function (s) { return String(s || '').trim(); };
+    var texts = {
+      1: 'CLIENTE:', 2: up(v.cliente), 3: up(v.endereco), 4: up(v.bairro), 5: up(v.cidade), 6: tr(v.cep),
+      7: 'Pedido', 8: tr(v.pedido), 9: 'Nota Fiscal', 10: tr(v.nf), 11: 'VOL', 12: '',
+      13: tr(v.coleta) ? 'Transp Coleta: ' + tr(v.coleta) : '',
+      14: hasRed ? 'Redespacho: ' + tr(v.redespacho) : ''
+    };
+    var volWorst = v.total + '/' + v.total;             // pior caso de largura
+    var mid = hasRed ? MID_WITH_REDESP : MID_NO_REDESP;
+    var warnings = [];
+    var objects = DEFS.map(function (d) {
+      var g = mid[d.idx] || GEOM[d.idx];
+      var text = d.idx === 12 ? volWorst : texts[d.idx];
+      var f = g.font === null ? { px: null, ok: true } : fitFont(text, g.w, g.font, g.lines || 1, measure);
+      if (!f.ok) warnings.push('Texto longo demais para a etiqueta (campo ' + d.key + '): ' + text);
+      return {
+        idx: d.idx, name: d.name, key: d.key, indexTag: !!d.indexTag, stretch: !!d.stretch,
+        src: d.src, prop: d.prop || null,
+        left: g.l, top: g.t, width: g.w, height: g.h,
+        fontHeight: f.px === null ? null : -f.px, halign: g.align || null, maxLines: g.lines || 1
+      };
+    });
+    return { objects: objects, qr: QR, texts: texts, hasRed: hasRed, warnings: warnings };
+  }
+
+  // ---------------------------------------------------------------------------------------------
+  // Escrita do FP3
+  // ---------------------------------------------------------------------------------------------
+  var NULLBAND = '<TfrxNullBand FillType="ftBrush" FillGap.Top="0" FillGap.Left="0" FillGap.Bottom="0" FillGap.Right="0" Frame.Typ="0" Height="222,99227" Left="0" Top="0" Width="374,17347" l="0" t="0"/>';
+  var REPORT = '<report><TfrxReport DotMatrixReport="0" PreviewOptions.OutlineVisible="0" PreviewOptions.OutlineWidth="120" ReportOptions.Name=""/></report>';
+  var SRC_PAGE_OPEN = '<TfrxReportPage PaperWidth="100" PaperHeight="60" PaperSize="256" LeftMargin="0,5" RightMargin="0,5" TopMargin="0,5" BottomMargin="0,5" ColumnWidth="0" ColumnPositions.Text="" Frame.Typ="0" MirrorMode="0" HGuides.Text="" VGuides.Text="" OnBeforePrint="Page1OnBeforePrint">';
+  var MASTER_OPEN = '<TfrxMasterData Name="MasterData1" FillType="ftBrush" FillGap.Top="0" FillGap.Left="0" FillGap.Bottom="0" FillGap.Right="0" Frame.Typ="0" Height="219,21259843" Left="0" Top="18,89765" Width="374,17347" ColumnWidth="0" ColumnGap="0" DataSetName="frxDBEtiquetaNova" RowCount="0">';
+  var DICTIONARY = '<dictionary><b1 name="Page0.MasterData1"/><b2 name="Page0.Barcode2D1"/><m0 name="Page0.MasterData1"/><m1 name="Page0.Memo4"/><m10 name="Page0.Memo11"/><m11 name="Page0.Memo12"/><m12 name="Page0.frxDBEtiquetaNovaNroVolume"/><m13 name="Page0.frxDBEtiquetaNovaNOMTRA"/><m14 name="Page0.Memo13"/><m2 name="Page0.Memo5"/><m3 name="Page0.Memo6"/><m4 name="Page0.Memo7"/><m5 name="Page0.Memo8"/><m6 name="Page0.frxDBEtiquetaNovaCEPCLI"/><m7 name="Page0.Memo9"/><m8 name="Page0.frxDBEtiquetaNovaNroPedido"/><m9 name="Page0.Memo10"/><mA name="Page0.MasterData1"/></dictionary>';
+
+  function utf16Hex(text) {
+    var out = '';
+    for (var i = 0; i < text.length; i++) {
+      var c = text.charCodeAt(i);
+      out += ((c & 255).toString(16).padStart(2, '0') + (c >> 8).toString(16).padStart(2, '0')).toUpperCase();
+    }
+    return out;
+  }
+
+  function barcodeXml(q) {
+    return '<TfrxBarcode2DView Name="Barcode2D1" AllowVectorExport="True" Left="' + fmt(q.left) + '" Top="' + fmt(q.top) +
+      '" Width="' + fmt(q.width) + '" Height="' + fmt(q.height) + '" StretchMode="smActualHeight" AutoSize="False" BarType="bcCodeQR" ' +
+      'BarProperties.Encoding="qrAuto" BarProperties.QuietZone="0" BarProperties.ErrorLevels="ecL" BarProperties.PixelSize="4" ' +
+      'BarProperties.CodePage="0" DataField="QR" DataSetName="frxDBEtiquetaNova" Frame.Typ="0" Rotation="0" ShowText="False" ' +
+      'HexData="31003200330034003500360037003800" Zoom="0,926884156904762" FontScaled="True" QuietZone="0"/>';
+  }
+
+  function memoXml(o) {
+    var s = '<TfrxMemoView Name="' + o.name + '"' + (o.indexTag ? ' IndexTag="1"' : '') + ' AllowVectorExport="True"' +
+      ' Left="' + fmt(o.left) + '" Top="' + fmt(o.top) + '" Width="' + fmt(o.width) + '" Height="' + fmt(o.height) + '"' +
+      (o.stretch ? ' StretchMode="smActualHeight"' : '');
+    if (o.fontHeight !== null && o.fontHeight !== undefined) {
+      s += ' Font.Charset="1" Font.Color="0" Font.Height="' + o.fontHeight + '" Font.Name="Arial" Font.Style="1"';
+    }
+    s += ' Frame.Typ="0"' + (o.halign ? ' HAlign="' + o.halign + '"' : '') +
+      (o.fontHeight !== null && o.fontHeight !== undefined ? ' ParentFont="False"' : '') +
+      ' Text="' + o.src + '"' + (o.prop ? ' PropData="' + o.prop + '"' : '') + '/>';
+    return s;
+  }
+
+  // objects: itens de computeLayout().objects (ou equivalentes);  pages: [{ texts:{1..14}, qr:'texto do QR' }]
+  function buildFp3(objects, qr, pages) {
+    var out = ['<?xml version="1.0" encoding="utf-8" standalone="no"?><preparedreport><previewpages>'];
+    pages.forEach(function (pg, i) {
+      var p = '<page0' + (i >= 2 ? ' ld="0"' : '') + '>' + (i === 0 ? NULLBAND : '') + '<b1 t="0">' +
+        '<b2 DataSet="frxDBEtiquetaNova" HexData="' + utf16Hex(pg.qr) + '" />';
+      for (var k = 1; k <= 14; k++) p += '<m' + k + ' u="' + esc(pg.texts[k]) + '"/>';
+      out.push(p + '</b1></page0>');
+    });
+    out.push('</previewpages><outline/><logicalpagenumbers>');
+    pages.forEach(function (_, i) { out.push('<page n="' + (i + 1) + '"/>'); });
+    out.push('</logicalpagenumbers>' + REPORT + '<sourcepages>' + SRC_PAGE_OPEN + MASTER_OPEN + barcodeXml(qr));
+    objects.forEach(function (o) { out.push(memoXml(o)); });
+    out.push('</TfrxMasterData></TfrxReportPage></sourcepages>' + DICTIONARY + '<picturecache/><postprocessing/></preparedreport>');
+    return out.join('');
+  }
+
+  // v: valores do formulário (inclui total e start). Devolve { xml, pages, layout }.
+  function exportFp3(v, measure) {
+    var layout = computeLayout(v, measure);
+    var pages = [];
+    for (var n = v.start; n <= v.total; n++) {
+      var t = {};
+      for (var k = 1; k <= 14; k++) t[k] = layout.texts[k];
+      t[12] = n + '/' + v.total;
+      pages.push({ texts: t, qr: qrText(v.pedido, n) });
+    }
+    return { xml: buildFp3(layout.objects, layout.qr, pages), pages: pages.length, layout: layout };
+  }
+
+  root.FP3 = {
+    BAND_W: BAND_W, BAND_H: BAND_H, INSET_PX: INSET_PX, MARGIN_PX: MARGIN_PX, GAP_X: GAP_X, GAP_Y: GAP_Y,
+    DEFS: DEFS, computeLayout: computeLayout, buildFp3: buildFp3, exportFp3: exportFp3,
+    qrText: qrText, utf16Hex: utf16Hex, fitFont: fitFont
+  };
+  if (typeof module !== 'undefined' && module.exports) module.exports = root.FP3;
+})(typeof window !== 'undefined' ? window : globalThis);
+
+</script>
+<script>
+const $ = id => document.getElementById(id);
+let generated = false;
+function value(id) { return $(id).value.trim(); }
+function escapeHTML(s) {
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+// Medição de texto em negrito Arial (mesma fonte da etiqueta) para ajustar o tamanho e evitar cortes.
+const measureCtx = document.createElement('canvas').getContext('2d');
+function measure(text, px) {
+  measureCtx.font = `bold ${px}px Arial, "Liberation Sans", Helvetica, sans-serif`;
+  return measureCtx.measureText(text).width;
+}
+
+function formValues() {
+  return {
+    nf: value('nf'), pedido: value('pedido'), coleta: value('coleta'), redespacho: value('redespacho'),
+    cliente: value('cliente'), endereco: value('endereco'), bairro: value('bairro'), cidade: value('cidade'), cep: value('cep'),
+    total: Number(value('total')), start: value('inicio') === '' ? 1 : Number(value('inicio'))
+  };
+}
+function validate(v) {
+  if (!v.pedido) { alert('Informe o número do pedido.'); return false; }
+  if (value('total') === '') { alert('Informe o total de volumes.'); return false; }
+  if (!Number.isInteger(v.total) || v.total < 1 || v.total > 5000) { alert('O total deve ser entre 1 e 5000 volumes.'); return false; }
+  if (!Number.isInteger(v.start) || v.start < 1 || v.start > v.total) { alert('O volume inicial deve estar entre 1 e o total de volumes.'); return false; }
+  return true;
+}
+
+// Monta uma etiqueta a partir do layout calculado (mesma tabela usada no FP3).
+function labelMarkup(n, v, layout) {
+  const px = x => x + 'px';
+  let html = '';
+  for (const o of layout.objects) {
+    const text = o.idx === 12 ? `${n}/${v.total}` : layout.texts[o.idx];
+    if (!text) continue;                                    // campo vazio (ex.: redespacho) não gera nada
+    const cls = 'obj' + (o.maxLines > 1 ? ' wrap' : '') + (o.halign === 'haCenter' ? ' center' : o.halign === 'haRight' ? ' right' : '');
+    html += `<div class="${cls}" style="left:${px(o.left)};top:${px(o.top)};width:${px(o.width)};height:${px(o.height)};${o.fontHeight === null ? 'font-size:13.3333px;font-weight:400' : 'font-size:' + px(-o.fontHeight)}">${escapeHTML(text)}</div>`;
+  }
+  const q = layout.qr;
+  html += `<div class="qr" data-qr="${escapeHTML(FP3.qrText(v.pedido, n))}" style="left:${px(q.left)};top:${px(q.top)};width:${px(q.width)};height:${px(q.height)}"></div>`;
+  return `<article class="label"><div class="band">${html}</div></article>`;
+}
+
+async function generate() {
+  if (typeof QRCode === 'undefined') {
+    alert('Não foi possível carregar a biblioteca de QR Code. Confira sua conexão com a internet e tente novamente.');
+    return;
+  }
+  const v = formValues();
+  if (!validate(v)) return;
+  const layout = FP3.computeLayout(v, measure);
+  if (layout.warnings.length) alert(layout.warnings.join('\n'));
+  const btn = $('generate');
+  btn.disabled = true;
+  $('status').textContent = 'Gerando etiquetas...';
+  $('labels').innerHTML = '';
+  const frag = document.createDocumentFragment();
+  const wrapper = document.createElement('div');
+  wrapper.innerHTML = Array.from({length: v.total - v.start + 1}, (_, i) => labelMarkup(v.start + i, v, layout)).join('');
+  while (wrapper.firstElementChild) frag.appendChild(wrapper.firstElementChild);
+  $('labels').appendChild(frag);
+  const qrNodes = [...document.querySelectorAll('.qr')];
+  // QR em pequenos lotes para não travar a página em pedidos grandes.
+  try {
+    for (let i = 0; i < qrNodes.length; i++) {
+      const node = qrNodes[i];
+      new QRCode(node, {text: node.dataset.qr, width: 220, height: 220, colorDark: '#000000', colorLight: '#ffffff', correctLevel: QRCode.CorrectLevel.L});
+      if (i % 40 === 39) await new Promise(resolve => setTimeout(resolve, 0));
+    }
+    generated = true;
+    $('status').textContent = `${qrNodes.length} etiqueta(s) · volumes ${v.start} a ${v.total}`;
+  } catch (error) {
+    generated = false;
+    $('status').textContent = 'Erro ao gerar as etiquetas';
+    alert('Ocorreu um erro ao gerar os QR Codes. Tente novamente.');
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+function exportFp3() {
+  const v = formValues();
+  if (!validate(v)) return;
+  try {
+    const r = FP3.exportFp3(v, measure);
+    if (r.layout.warnings.length) alert(r.layout.warnings.join('\n'));
+    const blob = new Blob([r.xml], {type: 'application/octet-stream'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `etiquetas_${v.pedido}.fp3`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1500);
+    alert(`Arquivo FP3 exportado com ${r.pages} página(s), uma etiqueta por página.`);
+  } catch (error) {
+    console.error(error);
+    alert('Não foi possível montar o FP3: ' + error.message);
+  }
+}
+
+$('generate').addEventListener('click', generate);
+$('exportFp3').addEventListener('click', exportFp3);
+$('print').addEventListener('click', () => {
+  if (!generated || !document.querySelector('.label')) return alert('Gere as etiquetas antes de imprimir.');
+  window.print();
+});
+$('clear').addEventListener('click', () => {
+  $('labels').innerHTML = '<div class="empty">Pré-visualização limpa. Gere novamente quando quiser.</div>';
+  $('status').textContent = 'Nenhuma etiqueta gerada';
+  generated = false;
+});
+</script>
+</body>
+</html>
